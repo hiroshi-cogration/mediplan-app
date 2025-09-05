@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Surgical Simulator - Save/Load Enabled</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/three-bsp-bundle@6.6.2/three-bsp-bundle.js"></script>
+  <style>
+    body{margin:0;overflow:hidden;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#111;color:#eee}
+    canvas{display:block}
+    #left-controls-wrapper,#object-list-panel{position:absolute;top:10px;display:flex;flex-direction:column;gap:10px;z-index:12;background:rgba(30,30,30,.85);padding:10px;border-radius:8px;border:1px solid #555;max-height:calc(100vh - 20px);overflow-y:auto}
+    #left-controls-wrapper{left:10px}
+    #object-list-panel{right:10px;width:280px}
+    #left-controls-container{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+    #secondary-panels-container{display:flex;flex-direction:column;gap:10px}
+    .control-panel{padding:10px;background:rgba(45,45,45,.9);color:#f0f0f0;border-radius:8px;border:1px solid #555;display:flex;flex-wrap:wrap;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+    .control-panel strong{color:#f0f0f0;width:100%;margin-bottom:5px}
+    #toolbar{flex-direction:column;align-items:flex-start;gap:8px}
+    #toolbar .tool-button-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr); /* 5列に変更 */
+      gap: 8px;
+      width: 100%;
+    }
+    #clipping-panel,#instrument-adjust-panel{display:none}
+    #instrument-adjust-panel div{display:flex;align-items:center;justify-content:space-between;width:100%;margin:2px 0}
+    #instrument-adjust-panel span{margin-right:10px}
+    #clipping-panel .clip-mode-group{display:flex;gap:10px;flex-wrap:wrap;width:100%;padding-bottom:5px;margin-bottom:5px;border-bottom:1px solid #555}
+    .panel-header{display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;padding-bottom:5px;border-bottom:1px solid #555;margin-bottom:5px}
+    .panel-header h3{margin:0;color:#f0f0f0}
+    #left-controls-wrapper.collapsed .panel-content,#object-list-panel.collapsed .panel-content{display:none}
+    button,select{margin:0;padding:8px;cursor:pointer;border:1px solid #777;background:#444;color:#ddd;border-radius:5px;transition:background-color .2s,border-color .2s; display:flex; align-items:center; justify-content:center;}
+    button:hover{background:#555;border-color:#999}
+    button.active{background:#007bff;color:#fff;border-color:#007bff}
+    .unit-toggle-group button.active { background-color: #007bff; color: white; }
+    #instrument-adjust-panel button,.toggle-btn{width:auto;padding:4px 8px}
+    input[type="color"]{width:40px;height:40px;border:none;padding:0;border-radius:5px;cursor:pointer}
+    input[type="range"],input[type="checkbox"]{cursor:pointer}
+    .control-panel label{display:flex;align-items:center;gap:5px}
+    .modal-container{position:absolute;background:#2a2a2a;color:#f0f0f0;border-radius:8px;padding:20px;z-index:200;box-shadow:0 5px 15px rgba(0,0,0,.7);border:1px solid #666}
+    #info-modal{top:50%;left:50%;transform:translate(-50%,-50%);width:450px;max-height:80vh;display:none;overflow-y:auto}
+    #video-player-container{top:10px;left:50%;transform:translateX(-50%);width:560px;display:none;background:#1e1e1e}
+    #info-modal h3{margin-top:0;border-bottom:1px solid #555;padding-bottom:10px}
+    #info-modal textarea,#video-player-container input{width:98%;margin-bottom:10px;background:#333;border:1px solid #666;color:#f0f0f0;padding:8px;border-radius:4px}
+    #info-modal #image-preview{max-width:100%;max-height:250px;margin-top:10px;display:none;border-radius:4px}
+    .modal-close-btn{position:absolute;top:10px;right:15px;cursor:pointer;font-weight:bold;font-size:24px;color:#aaa;transition:color .2s}
+    .modal-close-btn:hover{color:#fff}
+    #video-frame{width:100%;height:315px;border:none;margin-top:10px;background:#000}
+    #text-input{position:absolute;display:none;padding:8px;border:1px solid #999;background:#222;color:#eee;z-index:100;border-radius:4px}
+    #object-list-container{list-style:none;padding:0;margin:0}
+    #object-list-container li{padding:6px 4px;display:flex;align-items:center;justify-content:space-between;border-radius:4px;transition:background-color .2s}
+    #object-list-container li:hover{background:#444}
+    #object-list-container .item-controls { display: flex; align-items: center; }
+    #object-list-container input[type="checkbox"]{margin-right:10px;accent-color:#007bff}
+    #object-list-container label{color:#f0f0f0}
+    .target-btn { cursor: pointer; opacity: 0.5; font-size: 16px; margin-left: 10px; }
+    .target-btn.locked { opacity: 1.0; text-shadow: 0 0 5px #00e6e6; }
+    .collapsible-header{cursor:pointer;padding:8px 4px;background:#3a3a3a;border-radius:4px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;color:#f0f0f0}
+    .collapsible-header:hover{background:#4a4a4a}
+    .collapsible-content{padding-left:15px;max-height:0;overflow:hidden;transition:max-height .3s ease-out;list-style:none;margin:0}
+    .collapsible-header.active + .collapsible-content{max-height:1000px}
+    .toggle-arrow{transition:transform .3s ease-out}
+    .collapsible-header.active .toggle-arrow{transform:rotate(90deg)}
+    #scale-calibration, .unit-toggle-group { display: flex; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #555; width: 100%; gap: 5px; }
+    #scale-calibration input{width:60px;background:#333;border:1px solid #666;color:#f0f0f0;padding:5px;border-radius:4px;margin:0 5px}
+  </style>
+</head>
+<body>
+  <div id="left-controls-wrapper">
+    <div class="panel-header">
+      <h3>コントロール</h3>
+      <button id="left-panel-toggle" class="toggle-btn">収納</button>
+    </div>
+    <div id="left-controls-container" class="panel-content">
+      <div id="toolbar" class="control-panel">
+        <div class="tool-button-grid">
+          <button id="navigate-tool" class="tool-button active" title="視点操作">👁️</button>
+          <button id="select-tool"   class="tool-button" title="オブジェクト選択">👆</button>
+          <button id="erase-tool"    class="tool-button" title="パーツ消去">🧽</button>
+          <button id="erase-marker-tool" class="tool-button" title="マーカー消去">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v10"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m3.5 12.5 5 5"/><path d="m8.5 12.5-5 5"/></svg>
+          </button>
+          <button id="line-front-tool" class="tool-button" title="連続線を描く（表面）">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 12 C 12 8, 12 16, 16 12"/>
+            </svg>
+          </button>
+          <button id="line-back-tool" class="tool-button" title="連続線を描く（裏側・透過）">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 3h18v18H3z" stroke-dasharray="4 4" />
+                <path d="M8 12 C 12 8, 12 16, 16 12" />
+            </svg>
+          </button>
+          <button id="measure-tool"  class="tool-button" title="計測">📏</button>
+          <button id="clip-tool"     class="tool-button" title="クリッピング">✂️</button>
+          <button id="text-tool"     class="tool-button" title="テキスト">T</button>
+          <button id="info-tool"     class="tool-button" title="情報">ℹ️</button>
+          <button id="video-tool"    title="動画">▶️</button>
+          <button id="clear-tool"    title="マーカー全消去">🗑️</button>
+          <button id="save-plan-btn" title="計画を保存">💾</button>
+          <button id="load-plan-btn" title="計画を読込">📂</button>
+        </div>
+        <div><input type="color" id="color-picker" value="#ff0000" title="色の選択"></div>
+        <div><label for="text-size">Text:</label><input type="range" id="text-size" min="0.1" max="2.5" value="1.0" step="0.1"></div>
+        <div><label for="icon-size">Icon:</label><input type="range" id="icon-size" min="0.2" max="2.0" value="1.0" step="0.1"></div>
+        <div><label for="dot-size">点サイズ:</label><input type="range" id="dot-size" min="0.2" max="5.0" value="1.0" step="0.1"></div>
+        <div><label for="line-size">線サイズ:</label><input type="range" id="line-size" min="0.2" max="5.0" value="1.0" step="0.1"></div>
+        <div id="scale-calibration"><label for="scale-input" id="calibration-label">校正(cm):</label><input type="number" id="scale-input" value="10"><button id="calibrate-btn">適用</button></div>
+        <div class="unit-toggle-group"><label>単位:</label><button id="unit-mm">mm</button><button id="unit-cm" class="active">cm</button></div>
+      </div>
+
+      <div id="secondary-panels-container">
+        <div id="instrument-panel" class="control-panel"><strong>内視鏡・器具:</strong><button id="add-scope-btn">スコープ</button><button id="add-basket-btn">バスケット</button></div>
+        <div id="animation-panel" class="control-panel"><strong>手順:</strong><select id="model-selector"></select><button id="upload-model-btn">アップロード</button><button id="play-pause-btn">Animation Off</button></div>
+        <div id="clipping-panel" class="control-panel">
+          <strong>クリッピング設定</strong>
+          <div class="clip-mode-group">
+            <label><input type="radio" name="clip-mode" value="plane" checked> 平面</label>
+            <label><input type="radio" name="clip-mode" value="box"> ボックス</label>
+          </div>
+          <label><input type="checkbox" id="clipping-toggle"> クリッピングを有効化</label>
+        </div>
+        <div id="instrument-adjust-panel" class="control-panel">
+          <strong>器具微調整</strong>
+          <div><span>左右(X):</span><div><button id="move-x-neg">-</button><button id="move-x-pos">+</button></div></div>
+          <div><span>上下(Y):</span><div><button id="move-y-neg">-</button><button id="move-y-pos">+</button></div></div>
+          <div><span>前後(Z):</span><div><button id="move-z-neg">-</button><button id="move-z-pos">+</button></div></div>
+          <div><span>サイズ:</span><div><button id="scale-down">-</button><button id="scale-up">+</button></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="model-upload-input" style="display:none" accept=".glb" />
+  <input type="file" id="load-plan-input" style="display:none" accept=".json" />
+  <input type="text" id="text-input" />
+  <div id="info-modal" class="modal-container">
+    <span id="info-modal-close" class="modal-close-btn">×</span>
+    <h3>情報ポイント</h3>
+    <textarea id="info-text-input" placeholder="ここに説明文を入力..."></textarea>
+    <label for="info-image-input">画像をアップロード:</label>
+    <input type="file" id="info-image-input" accept="image/jpeg, image/png">
+    <img id="image-preview" src="" alt="Image preview">
+    <button id="info-save-btn">保存</button>
+  </div>
+
+  <div id="video-player-container" class="modal-container">
+    <span id="close-video" class="modal-close-btn">×</span>
+    <div><input type="text" id="video-url-input" placeholder="YouTube or Vimeo URL"><button id="load-video-btn">Load</button></div>
+    <iframe id="video-frame" allow="fullscreen; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  </div>
+
+  <div id="object-list-panel">
+    <div class="panel-header"><h3>Model Parts</h3><button id="right-panel-toggle" class="toggle-btn">収納</button></div>
+    <div id="object-list-container" class="panel-content"></div>
+  </div>
+
+  <script type="importmap">
+  { "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  } }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+    document.addEventListener('DOMContentLoaded', (event) => {
+        const clippingToggle = document.getElementById('clipping-toggle');
+        if (clippingToggle) { clippingToggle.checked = false; }
+    });
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x2d3436);
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1000);
+    camera.position.set(-1.5, 1, 8);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.localClippingEnabled = false;
+    document.body.appendChild(renderer.domElement);
+    
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    dirLight.position.set(5, 10, 7.5);
+    scene.add(dirLight);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    const clock = new THREE.Clock();
+
+    const objectListContainer = document.getElementById('object-list-container');
+    const modelSelector = document.getElementById('model-selector');
+    let dotSize = 0.03, lineThickness = 0.01, textScaleFactor = 1.0;
+    let scaleRatio = null;
+    let currentUnit = 'cm';
+
+    const modelFiles = [
+        'step01.glb', 'step02.glb', 'step03.glb', 'step04.glb', 'step05.glb',
+        'step06.glb', 'step07.glb', 'step08.glb', 'step09.glb', 'step10.glb', 'step11-2.glb',
+        'step_all.glb', 'step_all_new05.glb'
+    ];
+
+    let loadedModel = null;
+    const loader = new GLTFLoader();
+    let mixer = null, activeActions = [], allMeshes = [];
+    const originalMaterials = new Map();
+    let lockedTarget = null; 
+
+    let clipMode = 'plane';
+    const planeClip = { plane: new THREE.Plane(new THREE.Vector3(0, -1, 0), 0), helper: null };
+    const boxClip = { planes: [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0), new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0), new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Plane(new THREE.Vector3(0, -1, 0), 0), new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), new THREE.Plane(new THREE.Vector3(0, 0, -1), 0)], box: null };
+
+    function loadModel(url) {
+        if (loadedModel) { scene.remove(loadedModel); clearAllMarkers(); }
+        const modelPath = `./models/${url}`;
+        loader.load(modelPath, (gltf) => {
+            loadedModel = gltf.scene; allMeshes = []; originalMaterials.clear(); lockedTarget = null;
+            const box = new THREE.Box3().setFromObject(loadedModel);
+            const center = box.getCenter(new THREE.Vector3());
+            loadedModel.position.sub(center);
+            const size = box.getSize(new THREE.Vector3()).length();
+            const scale = 4.0 / size;
+            loadedModel.scale.set(scale, scale, scale);
+            controls.target.set(0, 0, 0); controls.update();
+            dotSize = size * 0.007; lineThickness = size * 0.0025; textScaleFactor = size / 1.5;
+            scene.add(loadedModel);
+            objectListContainer.innerHTML = ''; 
+            const uniqueNames = new Set();
+            loadedModel.traverse(child => {
+                if (child.isMesh) {
+                    allMeshes.push(child);
+                    originalMaterials.set(child, child.material);
+                    const name = child.name || `Mesh ${child.id}`;
+                    if(uniqueNames.has(name)) return;
+                    uniqueNames.add(name);
+
+                    const li = document.createElement('li');
+                    const itemControls = document.createElement('div');
+                    itemControls.className = 'item-controls';
+                    
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox'; cb.checked = true; cb.id = `check-${name.replace(/\s/g, '_')}`;
+                    cb.dataset.name = name;
+                    cb.addEventListener('change', e => { 
+                        const targetName = e.target.dataset.name;
+                        loadedModel.traverse(o => { if (o.isMesh && o.name === targetName) o.visible = e.target.checked; });
+                    });
+                    
+                    const lbl = document.createElement('label'); lbl.textContent = name; lbl.htmlFor = cb.id;
+                    itemControls.appendChild(cb);
+                    itemControls.appendChild(lbl);
+
+                    const targetBtn = document.createElement('span');
+                    targetBtn.className = 'target-btn';
+                    targetBtn.textContent = '🎯';
+                    targetBtn.title = '描画ターゲットに設定';
+                    targetBtn.dataset.uuid = child.uuid;
+                    targetBtn.addEventListener('click', (e) => setLockedTarget(child, e.currentTarget));
+
+                    li.appendChild(itemControls);
+                    li.appendChild(targetBtn);
+                    objectListContainer.appendChild(li);
+
+                    child.material.side = THREE.DoubleSide;
+                }
+            });
+            mixer = new THREE.AnimationMixer(loadedModel); activeActions = [];
+            if (gltf.animations?.length) {
+                gltf.animations.forEach(clip => { const a = mixer.clipAction(clip); a.play(); activeActions.push(a); });
+                document.getElementById('play-pause-btn').textContent = "Animation Off";
+                document.getElementById('play-pause-btn').disabled = false;
+            } else {
+                document.getElementById('play-pause-btn').textContent = "No Animation";
+                document.getElementById('play-pause-btn').disabled = true;
+            }
+            updateClippingForAllMaterials();
+        }, undefined, e => { console.error(e); alert(`モデル(${url})の読み込みに失敗しました。`); });
+    }
+
+    function setLockedTarget(targetMesh, targetButton) {
+        document.querySelectorAll('.target-btn').forEach(btn => btn.classList.remove('locked'));
+        if (lockedTarget === targetMesh) {
+            lockedTarget = null;
+        } else {
+            lockedTarget = targetMesh;
+            targetButton.classList.add('locked');
+        }
+    }
+
+    let currentTool = 'navigate', currentColor = '#ff0000';
+    const markers = [];
+    let currentLineGroup = null, lastClickTime = 0;
+    let measureStartPoint = null, tempMeasureMarker = null;
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const transformControls = new TransformControls(camera, renderer.domElement);
+    scene.add(transformControls);
+    transformControls.addEventListener('dragging-changed', e => { controls.enabled = !e.value; });
+    
+    let draggedObject = null;
+    const dragPlane = new THREE.Plane();
+    const intersectionPoint = new THREE.Vector3();
+    const dragStartPos = new THREE.Vector3();
+
+    function findMarkerParent(object) {
+        if (object.userData.isMeasurementLabel || object.userData.isText || object.userData.isInfoIcon) {
+            return object;
+        }
+        let current = object;
+        while (current.parent && current.parent !== scene) {
+            if (markers.includes(current.parent)) {
+                return current.parent;
+            }
+            current = current.parent;
+        }
+        if (markers.includes(object)) {
+            return object;
+        }
+        return null;
+    }
+
+    function removeMarker(marker) {
+        if (!marker) return;
+        
+        if (marker.userData.isMeasurement) {
+            const label = markers.find(m => m.userData.isMeasurementLabel && m.userData.parentMeasureGroup === marker.uuid);
+            if (label) removeMarker(label);
+        }
+
+        scene.remove(marker);
+        marker.traverse(child => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (child.material.map) child.material.map.dispose();
+                Array.isArray(child.material) ? child.material.forEach(m => m.dispose()) : child.material.dispose();
+            }
+        });
+        const index = markers.indexOf(marker);
+        if (index > -1) markers.splice(index, 1);
+    }
+    
+    function onMouseDown(event) {
+        if (event.target.closest('#left-controls-wrapper, .modal-container, #object-list-panel, #text-input') || !loadedModel) return;
+        mouse.x = (event.clientX / innerWidth) * 2 - 1; mouse.y = -(event.clientY / innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        const draggableObjects = markers.filter(m => m.userData.isDraggable);
+
+        const intersectsDraggable = raycaster.intersectObjects(draggableObjects, false);
+
+        if (intersectsDraggable.length > 0 && currentTool === 'navigate') {
+            draggedObject = intersectsDraggable[0].object;
+            if (draggedObject) {
+                dragStartPos.copy(draggedObject.position);
+                controls.enabled = false;
+                dragPlane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(dragPlane.normal).negate(), draggedObject.position);
+                renderer.domElement.style.cursor = 'move';
+            }
+            return;
+        }
+
+        if (currentTool === 'erase-marker') {
+            const intersects = raycaster.intersectObjects(markers, true);
+            if (intersects.length > 0) {
+                let objectToDelete = findMarkerParent(intersects[0].object);
+                if (objectToDelete) removeMarker(objectToDelete);
+            }
+            return;
+        }
+        
+        if (currentTool === 'select' || currentTool === 'erase') {
+            const hits = raycaster.intersectObjects(allMeshes, true);
+            if (hits.length > 0) {
+                 const object = hits[0].object;
+                 if (currentTool === 'select') { transformControls.attach(object); } 
+                 else { object.parent.remove(object); const index = allMeshes.indexOf(object); if (index > -1) allMeshes.splice(index, 1); }
+            } else { if (currentTool === 'select') transformControls.detach(); }
+            return;
+        }
+        
+        const objectsToIntersect = lockedTarget ? [lockedTarget] : allMeshes.filter(m => m.visible);
+        const hits = raycaster.intersectObjects(objectsToIntersect, true);
+
+        if (hits.length > 0) {
+            let targetPoint = hits[0].point;
+
+            if (currentTool === 'line-back') {
+                const backFaceHit = hits.find(hit => {
+                    const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+                    return normal.dot(raycaster.ray.direction) > 0;
+                });
+                if (backFaceHit) { targetPoint = backFaceHit.point; }
+                else { return; }
+            }
+            
+            if (currentTool === 'line-front' || currentTool === 'line-back') handleLineDrawing(targetPoint);
+            else if (currentTool === 'measure') handleMeasureClick(hits[0].point);
+            else if (currentTool === 'text') showTextInput(event.clientX, event.clientY, hits[0].point);
+            else if (currentTool === 'info') openInfoModal(null, hits[0].point);
+        }
+    }
+
+    function onMouseMove(event) {
+        if (draggedObject) {
+            mouse.x = (event.clientX / innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.ray.intersectPlane(dragPlane, intersectionPoint);
+            draggedObject.position.copy(intersectionPoint);
+        }
+    }
+
+    function onMouseUp(event) {
+        if (draggedObject) {
+            if (draggedObject.userData.isInfoIcon && dragStartPos.distanceTo(draggedObject.position) < 0.01) {
+                openInfoModal(draggedObject);
+            }
+            draggedObject = null;
+            controls.enabled = true;
+            renderer.domElement.style.cursor = 'grab';
+        }
+    }
+
+    function updateClippingForAllMaterials() {
+        if (!loadedModel) return;
+        const isClippingEnabled = document.getElementById('clipping-toggle').checked;
+        if (!isClippingEnabled) {
+             loadedModel.traverse(c => { if (c.isMesh && c.material) { c.material.clippingPlanes = null; } });
+             return;
+        }
+        let planes = [], inter = false;
+        if (clipMode === 'plane') { planes = [planeClip.plane]; inter = false; } else { planes = boxClip.planes; inter = true; }
+        loadedModel.traverse(c => { if (c.isMesh && c.material) { c.material.clippingPlanes = planes; c.material.clipIntersection = inter; } });
+    }
+    function handleLineDrawing(point) {
+        const now = Date.now();
+        if (now - lastClickTime < 300) { finalizeLine(); } else {
+            if (!currentLineGroup) { currentLineGroup = new THREE.Group(); currentLineGroup.userData.points = []; currentLineGroup.userData.isLineGroup = true; scene.add(currentLineGroup); markers.push(currentLineGroup); }
+            const dot = createDot(point); currentLineGroup.add(dot);
+            currentLineGroup.userData.points.push(point.clone());
+            updateLine(currentLineGroup);
+        }
+        lastClickTime = now;
+    }
+    
+    function updateLine(lineGroup) {
+        if (!lineGroup || !lineGroup.userData.points) return;
+        const pts = lineGroup.userData.points; if (pts.length < 2) return;
+        const old = lineGroup.getObjectByName("line");
+        const color = old ? old.material.color : new THREE.Color(currentColor);
+        if(old) lineGroup.remove(old);
+        
+        const t = lineThickness * parseFloat(document.getElementById('line-size').value);
+        const curve = new THREE.CatmullRomCurve3(pts);
+        const geo = new THREE.TubeGeometry(curve, pts.length * 10, t, 8, false);
+        const mat = new THREE.MeshBasicMaterial({ color: color, depthTest: false });
+        const tube = new THREE.Mesh(geo, mat); tube.name = "line"; lineGroup.add(tube);
+    }
+    function finalizeLine() { if (currentLineGroup) { currentLineGroup = null; } }
+    
+    function handleMeasureClick(point) {
+        if (!measureStartPoint) {
+            measureStartPoint = point.clone();
+            if (tempMeasureMarker) removeMarker(tempMeasureMarker);
+            tempMeasureMarker = createDot(measureStartPoint); scene.add(tempMeasureMarker); markers.push(tempMeasureMarker);
+        } else {
+            const end = point.clone();
+            const g = new THREE.Group();
+            g.add(createDot(measureStartPoint));
+            g.add(createDot(end));
+            const line = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(measureStartPoint, end), 2, lineThickness * 0.5, 8, false), new THREE.MeshBasicMaterial({ color: new THREE.Color(currentColor), depthTest: false }));
+            line.name = "measureLine";
+            g.add(line);
+            
+            g.userData.isMeasurement = true;
+            g.userData.startPoint = measureStartPoint.clone();
+            g.userData.endPoint = end.clone();
+            
+            scene.add(g);
+            markers.push(g);
+
+            updateMeasurementLabel(g);
+
+            removeMarker(tempMeasureMarker); tempMeasureMarker = null; measureStartPoint = null;
+        }
+    }
+    
+    function updateMeasurementLabel(measureGroup) {
+        const existingLabel = markers.find(m => m.userData.isMeasurementLabel && m.userData.parentMeasureGroup === measureGroup.uuid);
+        const color = new THREE.Color(currentColor); // Always use the current color
+        
+        if (existingLabel) {
+            removeMarker(existingLabel);
+        }
+
+        const start = measureGroup.userData.startPoint;
+        const end = measureGroup.userData.endPoint;
+        const distanceInUnits = start.distanceTo(end);
+        
+        let value = distanceInUnits;
+        let unitLabel = currentUnit;
+
+        if (scaleRatio) {
+            value = distanceInUnits * scaleRatio; // This is now in mm
+            if (currentUnit === 'cm') {
+                value /= 10;
+            }
+        } else {
+            // If not calibrated, display the value in the selected unit assuming 1 unit = 1mm
+            value = distanceInUnits;
+            if (currentUnit === 'cm') {
+                // To avoid large numbers for uncalibrated models, let's make a reasonable guess
+                // This part is heuristic. Let's assume the default model size (4 units) is around 10cm (100mm)
+                // This makes 1 unit = 25mm.
+                const assumedScale = 25; // 1 unit = 25mm = 2.5cm
+                value *= (assumedScale / 10);
+            } else { // mm
+                const assumedScale = 25; // 1 unit = 25mm
+                value *= assumedScale;
+            }
+        }
+        
+        const text = `${value.toFixed(2)} ${unitLabel}`;
+        
+        const pos = existingLabel ? existingLabel.position : new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+        const label = drawText(text, pos, color, true);
+        label.userData.isMeasurementLabel = true;
+        label.userData.isDraggable = true;
+        label.userData.parentMeasureGroup = measureGroup.uuid;
+        
+        scene.add(label);
+        markers.push(label);
+    }
+
+    function createDot(position) {
+        const dotSizeValue = dotSize;
+        const m = new THREE.Mesh(new THREE.SphereGeometry(dotSizeValue, 16, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(currentColor), depthTest: false }));
+        m.scale.setScalar(parseFloat(document.getElementById('dot-size').value));
+        m.position.copy(position); m.renderOrder = 1; m.userData.isDot = true;
+        return m;
+    }
+    const textInput = document.getElementById('text-input');
+    function showTextInput(x, y, position) {
+        textInput.style.display = 'block'; textInput.style.left = `${x}px`; textInput.style.top = `${y}px`; textInput.focus();
+        textInput.onkeydown = e => {
+            if (e.key === 'Enter' && textInput.value) { drawText(textInput.value, position); textInput.style.display = 'none'; textInput.value = ''; }
+            else if (e.key === 'Escape') { textInput.style.display = 'none'; textInput.value = ''; }
+        };
+    }
+    function drawText(text, position, color = new THREE.Color(currentColor), isMeasure = false) {
+        const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+        const fs = 128; ctx.font = `Bold ${fs}px Arial`;
+        const m = ctx.measureText(text); canvas.width = m.width; canvas.height = fs * 1.2;
+        ctx.font = `Bold ${fs}px Arial`; ctx.fillStyle = color.getStyle(); ctx.fillText(text, 0, fs);
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false, transparent: true, sizeAttenuation: false }));
+        
+        const baseScale = textScaleFactor * (isMeasure ? 0.05 : 0.05);
+        sprite.userData.baseScale = new THREE.Vector2((canvas.width / fs) * baseScale, (canvas.height / fs) * baseScale);
+        
+        const multiplier = parseFloat(document.getElementById('text-size').value);
+        sprite.scale.copy(sprite.userData.baseScale).multiplyScalar(multiplier);
+
+        sprite.position.copy(position); sprite.renderOrder = 2;
+        if (!isMeasure) {
+            sprite.userData.isText = true;
+            sprite.userData.isDraggable = true;
+            scene.add(sprite);
+            markers.push(sprite);
+        }
+        return sprite;
+    }
+    let activeInfoIcon = null;
+    const infoModal = document.getElementById('info-modal');
+    function openInfoModal(icon, position) {
+        if (icon) { activeInfoIcon = icon; } 
+        else { activeInfoIcon = drawInfoIcon(position); scene.add(activeInfoIcon); markers.push(activeInfoIcon); }
+        document.getElementById('info-text-input').value = activeInfoIcon.userData.info?.text || '';
+        document.getElementById('image-preview').src = activeInfoIcon.userData.info?.image || '';
+        document.getElementById('image-preview').style.display = activeInfoIcon.userData.info?.image ? 'block' : 'none';
+        infoModal.style.display = 'block';
+    }
+    function drawInfoIcon(position) {
+        const c = document.createElement('canvas'); const ctx = c.getContext('2d'); c.width = 64; c.height = 64;
+        ctx.fillStyle = '#007bff'; ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('i', 32, 34);
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, sizeAttenuation: false }));
+        
+        s.userData.baseScale = 0.05;
+        const multiplier = parseFloat(document.getElementById('icon-size').value);
+        s.scale.setScalar(s.userData.baseScale * multiplier);
+
+        s.position.copy(position); s.renderOrder = 2; s.userData.info = {}; s.userData.isInfoIcon = true; s.userData.isDraggable = true;
+        return s;
+    }
+    function clearAllMarkers() { [...markers].forEach(removeMarker); currentLineGroup = null; tempMeasureMarker = null; measureStartPoint = null; }
+
+    const toolButtons = document.querySelectorAll('.tool-button, #video-tool');
+    const clippingPanel = document.getElementById('clipping-panel');
+    function setActiveTool(toolName, clickedButton) {
+        toolButtons.forEach(b => b.classList.remove('active'));
+        if(clickedButton) clickedButton.classList.add('active');
+        currentTool = toolName;
+        clippingPanel.style.display = toolName === 'clip' ? 'flex' : 'none';
+        if(toolName !== 'select') { transformControls.detach(); }
+        renderer.domElement.style.cursor = (toolName === 'navigate') ? 'grab' : 'auto';
+        
+        setModelTransparency(toolName === 'line-back');
+    }
+
+    function setModelTransparency(isTransparent) {
+        if (!loadedModel) return;
+        allMeshes.forEach(mesh => {
+            const originalMaterial = originalMaterials.get(mesh);
+            if (!originalMaterial) return;
+
+            if (isTransparent) {
+                if (!mesh.material.transparent) {
+                    const transparentMaterial = originalMaterial.clone();
+                    transparentMaterial.transparent = true;
+                    transparentMaterial.opacity = 0.3;
+                    transparentMaterial.depthWrite = false;
+                    mesh.material = transparentMaterial;
+                }
+            } else {
+                if (mesh.material.transparent) {
+                    mesh.material = originalMaterial;
+                }
+            }
+        });
+    }
+    
+    document.getElementById('navigate-tool').addEventListener('click', e => setActiveTool('navigate', e.currentTarget));
+    document.getElementById('select-tool').addEventListener('click', e => setActiveTool('select', e.currentTarget));
+    document.getElementById('erase-tool').addEventListener('click', e => setActiveTool('erase', e.currentTarget));
+    document.getElementById('erase-marker-tool').addEventListener('click', e => setActiveTool('erase-marker', e.currentTarget));
+    document.getElementById('line-front-tool').addEventListener('click', e => setActiveTool('line-front', e.currentTarget));
+    document.getElementById('line-back-tool').addEventListener('click', e => setActiveTool('line-back', e.currentTarget));
+    document.getElementById('measure-tool').addEventListener('click', e => setActiveTool('measure', e.currentTarget));
+    document.getElementById('clip-tool').addEventListener('click', e => setActiveTool('clip', e.currentTarget));
+    document.getElementById('text-tool').addEventListener('click', e => setActiveTool('text', e.currentTarget));
+    document.getElementById('info-tool').addEventListener('click', e => setActiveTool('info', e.currentTarget));
+    document.getElementById('video-tool').addEventListener('click', () => { document.getElementById('video-player-container').style.display = 'block'; });
+    document.getElementById('clear-tool').addEventListener('click', clearAllMarkers);
+    
+    document.getElementById('info-modal-close').addEventListener('click', () => infoModal.style.display = 'none');
+    document.getElementById('info-save-btn').addEventListener('click', () => {
+        if (activeInfoIcon) { activeInfoIcon.userData.info.text = document.getElementById('info-text-input').value; activeInfoIcon.userData.info.image = document.getElementById('image-preview').src; }
+        infoModal.style.display = 'none';
+    });
+    document.getElementById('info-image-input').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (file) { const reader = new FileReader(); reader.onload = (e) => { document.getElementById('image-preview').src = e.target.result; document.getElementById('image-preview').style.display = 'block'; }; reader.readAsDataURL(file); }
+    });
+    document.getElementById('close-video').addEventListener('click', () => { document.getElementById('video-player-container').style.display = 'none'; document.getElementById('video-frame').src=''; });
+    document.getElementById('load-video-btn').addEventListener('click', () => {
+        const url = document.getElementById('video-url-input').value; let embedUrl = '';
+        let ytMatch = url.match(/(?:v=|\/embed\/|\.be\/|shorts\/)([a-zA-Z0-9_-]{11})/);
+        if (ytMatch) { embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}`; }             
+        else { let vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/); if (vimeoMatch) { embedUrl = `https://player.vimeo.com/video/${vimeoMatch[1]}`; } }
+        if (embedUrl) { document.getElementById('video-frame').src = embedUrl; } else { alert('無効なYouTubeまたはVimeoのURLです。'); }
+    });
+    
+    document.getElementById('color-picker').addEventListener('input', e => { currentColor = e.target.value; });
+    document.getElementById('clipping-toggle').addEventListener('change', (e) => { renderer.localClippingEnabled = e.target.checked; updateClippingForAllMaterials(); });
+    
+    document.getElementById('dot-size').addEventListener('input', (e) => {
+        const newMultiplier = parseFloat(e.target.value);
+        markers.forEach(marker => {
+            const applySize = (obj) => { if (obj.userData.isDot) { obj.scale.setScalar(newMultiplier); }};
+            if(marker.isGroup) { marker.children.forEach(child => { if(child.userData.isDot) child.scale.setScalar(newMultiplier); }); } 
+            else { applySize(marker); }
+        });
+    });
+    document.getElementById('line-size').addEventListener('input', (e) => {
+        markers.forEach(marker => { if (marker.isGroup && marker.userData.points) { updateLine(marker); } });
+    });
+    document.getElementById('text-size').addEventListener('input', (e) => {
+        const multiplier = parseFloat(e.target.value);
+        markers.forEach(marker => {
+            if (marker.userData.isText && marker.userData.baseScale) {
+                marker.scale.copy(marker.userData.baseScale).multiplyScalar(multiplier);
+            } else if (marker.userData.isMeasurementLabel && marker.userData.baseScale) {
+                marker.scale.copy(marker.userData.baseScale).multiplyScalar(multiplier);
+            }
+        });
+    });
+    document.getElementById('icon-size').addEventListener('input', (e) => {
+        const multiplier = parseFloat(e.target.value);
+        markers.forEach(marker => {
+            if (marker.userData.isInfoIcon && typeof marker.userData.baseScale !== 'undefined') {
+                marker.scale.setScalar(marker.userData.baseScale * multiplier);
+            }
+        });
+    });
+
+    document.getElementById('left-panel-toggle').addEventListener('click', (e) => {
+        const wrapper = document.getElementById('left-controls-wrapper');
+        wrapper.classList.toggle('collapsed');
+        e.currentTarget.textContent = wrapper.classList.contains('collapsed') ? '表示' : '収納';
+    });
+    document.getElementById('right-panel-toggle').addEventListener('click', (e) => {
+        const wrapper = document.getElementById('object-list-panel');
+        wrapper.classList.toggle('collapsed');
+        e.currentTarget.textContent = wrapper.classList.contains('collapsed') ? '表示' : '収納';
+    });
+
+    document.getElementById('calibrate-btn').addEventListener('click', () => {
+        const realDistanceInput = parseFloat(document.getElementById('scale-input').value);
+        if (isNaN(realDistanceInput) || realDistanceInput <= 0) { alert("有効な数値を入力してください。"); return; }
+
+        const lastMeasureGroup = markers.slice().reverse().find(m => m.userData.isMeasurement);
+        if (!lastMeasureGroup) { alert("先に基準となる距離を計測してください。"); return; }
+        
+        const lastMeasuredDistanceInUnits = lastMeasureGroup.userData.startPoint.distanceTo(lastMeasureGroup.userData.endPoint);
+        
+        let realDistanceInMM = currentUnit === 'cm' ? realDistanceInput * 10 : realDistanceInput;
+        scaleRatio = realDistanceInMM / lastMeasuredDistanceInUnits;
+
+        alert(`スケールが校正されました。`);
+        markers.forEach(m => { if(m.userData.isMeasurement) updateMeasurementLabel(m); });
+    });
+
+    function updateUnit(newUnit) {
+        currentUnit = newUnit;
+        document.getElementById('calibration-label').textContent = `校正(${currentUnit}):`;
+        document.getElementById('unit-mm').classList.toggle('active', newUnit === 'mm');
+        document.getElementById('unit-cm').classList.toggle('active', newUnit === 'cm');
+        markers.forEach(m => { if(m.userData.isMeasurement) updateMeasurementLabel(m); });
+    }
+    document.getElementById('unit-mm').addEventListener('click', () => updateUnit('mm'));
+    document.getElementById('unit-cm').addEventListener('click', () => updateUnit('cm'));
+
+    modelFiles.forEach((fileName) => { const option = document.createElement('option'); option.value = fileName; let displayName = fileName.replace('.glb', '').replace(/[-_]/g, ' ').replace('step', 'Step '); displayName = displayName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '); option.textContent = displayName; modelSelector.appendChild(option); });
+    modelSelector.addEventListener('change', (event) => { loadModel(event.target.value); });
+
+    document.getElementById('play-pause-btn').addEventListener('click', () => {
+        if (!activeActions || activeActions.length === 0) return;
+        const isPlaying = !activeActions[0].paused;
+        activeActions.forEach(a => a.paused = isPlaying);
+        document.getElementById('play-pause-btn').textContent = isPlaying ? "Animation On" : "Animation Off";
+    });
+
+    function animate() { requestAnimationFrame(animate); const d = clock.getDelta(); if (mixer) mixer.update(d); controls.update(); renderer.render(scene, camera); }
+    if (modelFiles.length > 0) { loadModel(modelFiles[0]); }
+    animate();
+
+    window.addEventListener('mousedown', onMouseDown, false);
+    window.addEventListener('mousemove', onMouseMove, false);
+    window.addEventListener('mouseup', onMouseUp, false);
+    window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+  </script>
+</body>
