@@ -4,7 +4,8 @@ import { auth } from '../../firebase/config';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
-  onAuthStateChanged
+  onAuthStateChanged,
+  User 
 } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
@@ -15,7 +16,7 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, (user: User | null) => {
     if (user) {
       router.push('/dashboard');
     }
