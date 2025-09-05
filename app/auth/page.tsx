@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { auth } from '../../firebase/config';
 import { 
   createUserWithEmailAndPassword, 
@@ -22,7 +22,7 @@ export default function AuthPage() {
     }
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     try {
@@ -32,8 +32,12 @@ export default function AuthPage() {
         await createUserWithEmailAndPassword(auth, email, password);
       }
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred.');
+      }
     }
   };
 

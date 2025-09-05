@@ -1,12 +1,12 @@
 'use client';
 import { auth } from '../../firebase/config';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth'; // "User" をインポート
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function Dashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null); // 型を "any" から "User | null" に変更
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
