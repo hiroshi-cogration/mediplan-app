@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 画面が白く抜けるのを防ぐ基本設定 */
+html, body, :root {
+  height: 100%;
+}
+body {
+  /* ダークテーマの基本色をここで定義 */
+  @apply bg-gray-900 text-gray-200;
+}
+
 /* ===== Prototype Control Panel Styles START ===== */
 .controls-wrapper {
   position: absolute;

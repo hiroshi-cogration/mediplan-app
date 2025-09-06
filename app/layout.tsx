@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import "./globals.css"; // ← GPTが指摘する、必須のインポート
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "MediPlan",
@@ -13,8 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      {/* <body> にダークテーマ用のTailwindクラスを適用 */}
-      <body className="bg-gray-900 text-gray-200">{children}</body>
+      <body>{children}</body>
     </html>
   );
 }
