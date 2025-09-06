@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-// import "./globals.css"; ← この行は削除、またはコメントアウト
+import "./globals.css"; // ← Next.js標準のCSSインポートを復活させる
 
 export const metadata: Metadata = {
   title: "MediPlan",
@@ -13,11 +13,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <head>
-        {/* 事前にビルドされたCSSファイルを直接読み込む */}
-        <link rel="stylesheet" href="/styles.css" />
-      </head>
-      <body>{children}</body>
+      {/* <body> に直接ダークテーマのクラスを適用 */}
+      <body className="bg-gray-900 text-gray-200">{children}</body>
     </html>
   );
 }
