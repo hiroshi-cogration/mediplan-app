@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut, User } from 'firebase/auth';
 import { auth } from '@/firebase/config';
+// FIX: インポートパスに 'app' を追加
 import {
   getProcedureTemplates,
   createSurgicalPlan,
   ProcedureTemplate,
-} from '@/services/planService';
+} from '@/app/services/planService';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -18,8 +19,6 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 認証状態の監視は簡略化のため省略（既にあるはず）
-    // 術式テンプレートを読み込む
     const fetchTemplates = async () => {
       try {
         const fetchedTemplates = await getProcedureTemplates();
@@ -36,13 +35,11 @@ export default function DashboardPage() {
   }, []);
 
   const handleCreatePlan = async (template: ProcedureTemplate) => {
-    // 簡単なプロンプトで計画名を入力させる
     const planName = prompt(`新しい計画名を入力してください：`, `${template.name} - ${new Date().toLocaleDateString()}`);
 
     if (planName) {
       try {
         const newPlanId = await createSurgicalPlan(template, planName);
-        // 新しく作成された計画のシミュレーターページに遷移
         router.push(`/simulator/${newPlanId}`);
       } catch (err) {
         setError('計画の作成に失敗しました。');
