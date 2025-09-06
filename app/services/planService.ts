@@ -5,6 +5,8 @@ import {
   serverTimestamp,
   DocumentData,
   QueryDocumentSnapshot,
+  doc, // NEW: インポートを追加
+  getDoc, // NEW: インポートを追加
 } from 'firebase/firestore';
 import { db, auth } from '@/firebase/config';
 
@@ -24,9 +26,22 @@ export interface ProcedureTemplate extends DocumentData {
   steps: ProcedureStep[];
 }
 
+// NEW: 手術計画の型定義
+export interface SurgicalPlan extends DocumentData {
+  id: string;
+  planName: string;
+  ownerId: string;
+  templateId: string;
+  // createdAt, updatedAt は serverTimestamp のため、クライアント側では Date | null として扱うのが一般的
+  createdAt: any; 
+  updatedAt: any;
+  patientModelPath: string | null;
+  planData: any[]; // planDataの具体的な型は後で定義
+}
+
+
 // Firestoreのドキュメントを使いやすい形に変換するヘルパー関数
 const fromFirestore = <T extends DocumentData>(snapshot: QueryDocumentSnapshot): T => {
-  // FIX: 型アサーションをより厳格な (unknown as T) に変更
   return { id: snapshot.id, ...snapshot.data() } as unknown as T;
 };
 
@@ -40,35 +55,43 @@ export const getProcedureTemplates = async (): Promise<ProcedureTemplate[]> => {
 
 /**
  * 新しい手術計画を作成する
- * @param template - 使用する術式テンプレート
- * @param planName - ユーザーが入力する計画名
  */
 export const createSurgicalPlan = async (
   template: ProcedureTemplate,
   planName: string
 ): Promise<string> => {
   const user = auth.currentUser;
-  if (!user) {
-    throw new Error('User is not authenticated.');
-  }
-
-  // テンプレートのステップを元に、新しい計画のplanDataを作成
+  if (!user) throw new Error('User is not authenticated.');
   const initialPlanData = template.steps.map(step => ({
     stepNumber: step.stepNumber,
-    status: 'pending', // 初期ステータス
+    status: 'pending',
     annotations: null,
+
     modelTransform: null,
   }));
-
   const docRef = await addDoc(collection(db, 'surgical_plans'), {
     planName,
     ownerId: user.uid,
     templateId: template.id,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    patientModelPath: null, // 患者モデルは後からアップロード
+    patientModelPath: null,
     planData: initialPlanData,
   });
+  return docRef.id;
+};
 
-  return docRef.id; // 作成された手術計画のIDを返す
+
+// NEW: IDに基づいて単一の手術計画を取得する
+export const getSurgicalPlan = async (planId: string): Promise<SurgicalPlan | null> => {
+  const docRef = doc(db, 'surgical_plans', planId);
+  const docSnap = await getDoc(docRef);
+
+  if (docSnap.exists()) {
+    // ドキュメントデータをSurgicalPlan型にキャスト
+    return { id: docSnap.id, ...docSnap.data() } as SurgicalPlan;
+  } else {
+    console.error("No such document!");
+    return null;
+  }
 };
