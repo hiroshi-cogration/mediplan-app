@@ -7,46 +7,50 @@ import * as THREE from 'three';
 
 // GLBモデルを読み込んで表示するコンポーネント
 function Model({ url }: { url: string }) {
-  // useGLTFフックでモデルを非同期に読み込む
-  // publicフォルダからのパスを指定
   const { scene } = useGLTF(url);
 
-  // プロトタイプのロジックと同様に、読み込んだモデルの全メッシュに設定を適用
+  // GPTの推奨する、より安全な方法でシーンを処理
   const processedScene = useMemo(() => {
-    const newScene = scene.clone(); // 元のシーンをクローンして変更
+    const newScene = scene.clone();
     newScene.traverse(child => {
-      if ((child as THREE.Mesh).isMesh) {
-        // ダブルサイドレンダリングを有効化
-        child.material = (child as THREE.Mesh).material.clone();
-        (child as THREE.Mesh).material.side = THREE.DoubleSide;
+      // FIX: 'instanceof' を使って、childがMeshであることをTypeScriptに正しく伝える
+      if (child instanceof THREE.Mesh) {
+        const material = child.material;
+
+        // マテリアルが配列の場合と単一の場合の両方に対応
+        if (Array.isArray(material)) {
+          child.material = material.map(mat => {
+            const clonedMat = mat.clone();
+            clonedMat.side = THREE.DoubleSide;
+            return clonedMat;
+          });
+        } else {
+          const clonedMat = material.clone();
+          clonedMat.side = THREE.DoubleSide;
+          child.material = clonedMat;
+        }
       }
     });
     return newScene;
   }, [scene]);
 
-  // primitive objectとしてシーンを描画
   return <primitive object={processedScene} />;
 }
 
 // 3Dシーン全体を定義するコンポーネント
 export default function Scene() {
-  // まずはステップ1のモデルをハードコーディングで表示
   const modelUrl = '/models/step01.glb';
 
   return (
-    // Suspenseは、3Dモデルのような重いデータの読み込みが終わるまで待機するためのReactの機能
-    <Suspense fallback={<div className="loading">Loading 3D Model...</div>}>
+    <Suspense fallback={<div className="flex justify-center items-center h-full">Loading 3D Model...</div>}>
       <Canvas style={{ background: '#384047' }} camera={{ position: [-1.5, 1, 8], fov: 50 }}>
-        {/* 環境光と指向性光をプロトタイプに合わせて設定 */}
         <ambientLight intensity={1.2} />
         <directionalLight intensity={1.8} position={[5, 10, 7.5]} />
         
-        {/* Centerコンポーネントがモデルを自動で中央に配置し、サイズを調整してくれる */}
         <Center>
           <Model url={modelUrl} />
         </Center>
 
-        {/* カメラコントロール */}
         <OrbitControls makeDefault enableDamping />
       </Canvas>
     </Suspense>
