@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { getSurgicalPlan, SurgicalPlan } from '@/app/services/planService';
+import Scene from '@/app/components/Scene'; // NEW: Sceneコンポーネントをインポート
 
 export default function SimulatorPage() {
   const params = useParams();
-  const planId = params.planId as string; // planIdをstringとして取得
+  const planId = params.planId as string;
 
   const [plan, setPlan] = useState<SurgicalPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,37 +34,30 @@ export default function SimulatorPage() {
     };
 
     fetchPlanData();
-  }, [planId]); // planIdが変更された場合に再実行
+  }, [planId]);
 
   if (loading) {
-    return (
-      <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold">計画を読み込み中...</h1>
-      </div>
-    );
+    return <div className="p-8 text-center"><h1 className="text-2xl font-bold">計画を読み込み中...</h1></div>;
   }
 
   if (error) {
-    return (
-      <div className="p-8 text-center text-red-500">
-        <h1 className="text-2xl font-bold">{error}</h1>
-      </div>
-    );
+    return <div className="p-8 text-center text-red-500"><h1 className="text-2xl font-bold">{error}</h1></div>;
   }
 
-  if (!plan) {
-    return null; // データがない場合は何も表示しない
-  }
+  if (!plan) return null;
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">手術シミュレーター: {plan.planName}</h1>
-      <p className="mt-4 text-gray-400">
-        現在の計画ID: {plan.id}
-      </p>
-      <div className="mt-8 border-2 border-dashed border-gray-400 h-96 flex items-center justify-center">
-        <p className="text-gray-500">ここに3Dビューアが実装されます。</p>
-      </div>
+    <div className="p-8 flex flex-col h-screen">
+      <header>
+        <h1 className="text-2xl font-bold">手術シミュレーター: {plan.planName}</h1>
+        <p className="mt-2 text-gray-400">現在の計画ID: {plan.id}</p>
+      </header>
+      {/* FIX: プレースホルダーを実際のSceneコンポーネントに置き換え */}
+      <main className="flex-grow mt-8">
+        <div className="w-full h-full border-2 border-dashed border-gray-400">
+          <Scene />
+        </div>
+      </main>
     </div>
   );
 }
