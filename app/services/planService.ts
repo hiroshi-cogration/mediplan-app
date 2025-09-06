@@ -26,7 +26,8 @@ export interface ProcedureTemplate extends DocumentData {
 
 // Firestoreのドキュメントを使いやすい形に変換するヘルパー関数
 const fromFirestore = <T extends DocumentData>(snapshot: QueryDocumentSnapshot): T => {
-  return { id: snapshot.id, ...snapshot.data() } as T;
+  // FIX: 型アサーションをより厳格な (unknown as T) に変更
+  return { id: snapshot.id, ...snapshot.data() } as unknown as T;
 };
 
 /**
