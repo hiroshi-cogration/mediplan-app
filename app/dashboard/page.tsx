@@ -58,7 +58,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
+    <div className="min-h-screen bg-gray-900 text-white p-8 bg-red-500">
       <header className="flex justify-between items-center mb-10">
         <h1 className="text-3xl font-bold">MediPlan ダッシュボード</h1>
         <div>
