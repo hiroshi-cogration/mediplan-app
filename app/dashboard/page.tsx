@@ -13,7 +13,7 @@ import {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [user] = useState<User | null>(auth.currentUser);
   const [templates, setTemplates] = useState<ProcedureTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
