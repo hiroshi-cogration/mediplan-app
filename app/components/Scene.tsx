@@ -1,36 +1,54 @@
 'use client';
 
-import { useRef } from 'react';
-// FIX: 'type ThreeElements' を @react-three/fiber からインポート
-import { Canvas, useFrame, type ThreeElements } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import React, { Suspense, useMemo } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, useGLTF, Center } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 回転する立方体のコンポーネント
-// FIX: propsの型を ThreeElements['mesh'] に変更
-function Box(props: ThreeElements['mesh']) {
-  const meshRef = useRef<THREE.Mesh>(null!);
+// GLBモデルを読み込んで表示するコンポーネント
+function Model({ url }: { url: string }) {
+  // useGLTFフックでモデルを非同期に読み込む
+  // publicフォルダからのパスを指定
+  const { scene } = useGLTF(url);
 
-  useFrame((state, delta) => {
-    meshRef.current.rotation.y += delta * 0.5;
-  });
+  // プロトタイプのロジックと同様に、読み込んだモデルの全メッシュに設定を適用
+  const processedScene = useMemo(() => {
+    const newScene = scene.clone(); // 元のシーンをクローンして変更
+    newScene.traverse(child => {
+      if ((child as THREE.Mesh).isMesh) {
+        // ダブルサイドレンダリングを有効化
+        child.material = (child as THREE.Mesh).material.clone();
+        (child as THREE.Mesh).material.side = THREE.DoubleSide;
+      }
+    });
+    return newScene;
+  }, [scene]);
 
-  return (
-    <mesh {...props} ref={meshRef}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color={'royalblue'} />
-    </mesh>
-  );
+  // primitive objectとしてシーンを描画
+  return <primitive object={processedScene} />;
 }
 
 // 3Dシーン全体を定義するコンポーネント
 export default function Scene() {
+  // まずはステップ1のモデルをハードコーディングで表示
+  const modelUrl = '/models/step01.glb';
+
   return (
-    <Canvas style={{ background: '#202020' }}>
-      <ambientLight intensity={0.5} />
-      <pointLight position={[10, 10, 10]} />
-      <Box position={[0, 0, 0]} />
-      <OrbitControls />
-    </Canvas>
+    // Suspenseは、3Dモデルのような重いデータの読み込みが終わるまで待機するためのReactの機能
+    <Suspense fallback={<div className="loading">Loading 3D Model...</div>}>
+      <Canvas style={{ background: '#384047' }} camera={{ position: [-1.5, 1, 8], fov: 50 }}>
+        {/* 環境光と指向性光をプロトタイプに合わせて設定 */}
+        <ambientLight intensity={1.2} />
+        <directionalLight intensity={1.8} position={[5, 10, 7.5]} />
+        
+        {/* Centerコンポーネントがモデルを自動で中央に配置し、サイズを調整してくれる */}
+        <Center>
+          <Model url={modelUrl} />
+        </Center>
+
+        {/* カメラコントロール */}
+        <OrbitControls makeDefault enableDamping />
+      </Canvas>
+    </Suspense>
   );
 }
