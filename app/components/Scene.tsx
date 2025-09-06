@@ -1,12 +1,14 @@
 'use client';
 
-import { useRef } from 'react'; // 'React' のインポートを削除
-import { Canvas, useFrame } from '@react-three/fiber';
+import { useRef } from 'react';
+// FIX: 'type ThreeElements' を @react-three/fiber からインポート
+import { Canvas, useFrame, type ThreeElements } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
 // 回転する立方体のコンポーネント
-function Box(props: JSX.IntrinsicElements['mesh']) {
+// FIX: propsの型を ThreeElements['mesh'] に変更
+function Box(props: ThreeElements['mesh']) {
   const meshRef = useRef<THREE.Mesh>(null!);
 
   useFrame((state, delta) => {
