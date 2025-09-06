@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -20,7 +19,9 @@
     ],
     "paths": {
       "@/*": ["./*"]
-    }
+    },
+    // ★★★★★ この行が今回の修正の核心です ★★★★★
+    "types": ["node", "react", "react-dom"]
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
