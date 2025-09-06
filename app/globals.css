@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ===== Prototype Control Panel Styles START ===== */
 .controls-wrapper {
   position: absolute;
